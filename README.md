@@ -11,9 +11,7 @@ A WooCommerce add-on that allows customers to wishlist products via a widget.
 
 == Description ==
 
-Focus Mode adds a distraction-free reading experience to your WordPress posts. When enabled, it hides elements like the site header to let users concentrate on the content. An estimated reading time is also displayed at the top of each post to inform users how long it will take to read.
-
-This plugin is lightweight and designed for accessibility and readability. Ideal for blogs, long-form content, and educational sites.
+This plugin adds a widget for customers to be able to favorite products and share them with others via a wishlist. It is lightweight and designed for accessibility and readability. Ideal for WooCommerce e-commerce websites.
 
 == Installation ==
 
@@ -24,7 +22,7 @@ This plugin is lightweight and designed for accessibility and readability. Ideal
 == Frequently Asked Questions ==
 
 = Can I customize the tab color? =  
-Not at this time. Future updates may allow more control over settings.
+Not at this time. Future updates may allow more setting controls.
 
 = Is this compatible with all themes? =  
 The WooCommerce Wishlist Widget is designed to work with most well-coded themes. Some themes with heavily customized layouts may require adjustments.
