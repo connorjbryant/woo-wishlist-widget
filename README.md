@@ -11,7 +11,7 @@ A WooCommerce add-on that allows customers to wishlist products via a widget.
 
 == Description ==
 
-This plugin adds a widget for customers to be able to favorite products and share them with others via a wishlist. It is lightweight and designed for accessibility and readability. Ideal for WooCommerce e-commerce websites.
+This plugin adds a widget for customers to be able to favorite products and share them with others via a wishlist. It is lightweight and designed for accessibility and reliability. Ideal for WooCommerce e-commerce websites.
 
 == Installation ==
 
