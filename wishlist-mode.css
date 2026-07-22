@@ -22,10 +22,20 @@
     gap: 0.6rem;
 }
 
+.woocommerce ul.products li.product,
+.product,
+.ht-product {
+	position: relative;
+}
+
 .wishlist-sticky-tab:hover {
     background: #e00d0d;
     /* transform: translateY(-50%) translateX(-8px); */
     box-shadow: 0 12px 35px rgba(0,0,0,.25);
+    color: white !important;
+}
+
+.wishlist-sticky-tab:hover i {
     color: white !important;
 }
 

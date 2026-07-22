@@ -104,7 +104,8 @@ function wishlist_enqueue_assets() {
         'wishlistData',
         array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
-            'nonce'   => wp_create_nonce('wishlist_nonce')
+            'nonce'   => wp_create_nonce('wishlist_nonce'),
+            'wishlist'  => wishlist_get_user_wishlist(),
         )
     );
 }
