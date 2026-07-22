@@ -22,7 +22,7 @@ This plugin adds a widget for customers to be able to favorite products and shar
 == Frequently Asked Questions ==
 
 = Can I customize the tab color? =  
-Not at this time. Future updates may allow more setting controls.
+Not at this time. Future updates may be more flexible.
 
 = Is this compatible with all themes? =  
 The WooCommerce Wishlist Widget is designed to work with most well-coded themes. Some themes with heavily customized layouts may require adjustments.
