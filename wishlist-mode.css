@@ -28,14 +28,14 @@
 	position: relative;
 }
 
-.wishlist-sticky-tab:hover {
+.wishlist-sticky-tab:hover, .wishlist-sticky-tab:active {
     background: #e00d0d;
     /* transform: translateY(-50%) translateX(-8px); */
     box-shadow: 0 12px 35px rgba(0,0,0,.25);
     color: white !important;
 }
 
-.wishlist-sticky-tab:hover i {
+.wishlist-sticky-tab:hover i, .wishlist-sticky-tab:active {
     color: white !important;
 }
 
