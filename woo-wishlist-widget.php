@@ -144,7 +144,7 @@ function wishlist_enqueue_assets() {
 
 	wp_enqueue_style(
 		'wishlist-mode-style',
-		plugin_dir_url( __FILE__ ) . 'wishlist-mode.css',
+		plugin_dir_url( __FILE__ ) . 'assets/wishlist-mode.css',
 		array(),
 		$version
 	);
@@ -158,7 +158,7 @@ function wishlist_enqueue_assets() {
 
 	wp_enqueue_script(
 		'wishlist-mode-script',
-		plugin_dir_url( __FILE__ ) . 'wishlist-mode.js',
+		plugin_dir_url( __FILE__ ) . 'assets/wishlist-mode.js',
 		array( 'jquery' ),
 		$version,
 		true

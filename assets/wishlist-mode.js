@@ -315,9 +315,24 @@ jQuery(function ($) {
 			}
 		}
 		
-		// Ultimate fallback - use a default image
+		// Ultimate fallback - use a default icon
 		if (!firstImage) {
-			firstImage = encodeURIComponent('https://via.placeholder.com/300x300/ff1f1f/ffffff?text=Wishlist');
+			const svg = `
+			<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300">
+				<rect width="100%" height="100%" fill="#ffffff"/>
+				<path fill="#ff1f1f"
+					d="M150 255
+					L45 150
+					C15 120 15 75 45 45
+					C75 15 120 15 150 45
+					C180 15 225 15 255 45
+					C285 75 285 120 255 150
+					Z"/>
+			</svg>`;
+
+			firstImage = encodeURIComponent(
+				'data:image/svg+xml;charset=utf-8,' + svg
+			);
 		}
 		
 		// Use native share API if available (mobile)
