@@ -1,137 +1,371 @@
 jQuery(function ($) {
-	/**
-	 * Add wishlist hearts to product cards that did not receive
-	 * one through the normal WooCommerce PHP hook.
-	 */
-	function addWishlistHearts() {
-		$('.product, .ht-product, li.product').each(function () {
-			const card = $(this);
+	'use strict';
 
-			// Do not add a duplicate heart.
-			if (card.find('.wishlist-heart-wrapper').length) {
-				return;
+	const CARD_SELECTOR = [
+		'li.product',
+		'.product.type-product',
+		'.ht-product',
+		'.woolentor-product',
+		'.woolentor-grid-item',
+		'.wl-grid-product',
+		'.wc-block-grid__product',
+		'.wc-block-product',
+		'.product-item[data-product-id]',
+		'.product-card[data-product-id]'
+	].join(', ');
+
+	const pendingRequests = new Map();
+	const resolvedProductUrls = new Map();
+	let observerTimer = null;
+
+	function getSavedProductIds() {
+		return (wishlistData.wishlist || [])
+			.map(Number)
+			.filter(Number.isInteger);
+	}
+
+	function getProductId(card) {
+		const possibleValues = [
+			card.attr('data-product-id'),
+			card.attr('data-product_id'),
+			card.attr('data-id'),
+			card.data('product-id'),
+			card.data('product_id'),
+			card.data('id')
+		];
+
+		for (const value of possibleValues) {
+			const productId = parseInt(value, 10);
+
+			if (productId > 0) {
+				return productId;
+			}
+		}
+
+		/*
+		* WooCommerce and WooLentor commonly put the product ID on:
+		*
+		* - Add-to-cart buttons
+		* - Quick-view buttons
+		* - Wishlist/action buttons
+		* - Inner product wrappers
+		*/
+		const productIdElement = card.find([
+			'[data-product_id]',
+			'[data-product-id]',
+			'.add_to_cart_button',
+			'.ajax_add_to_cart',
+			'.woolentorquickview',
+			'.woolentor-quickview',
+			'.ht-product-action a'
+		].join(', ')).filter(function () {
+			return !$(this).hasClass('wishlist-heart-btn');
+		}).first();
+
+		if (productIdElement.length) {
+			const productId = parseInt(
+				productIdElement.attr('data-product_id') ||
+				productIdElement.attr('data-product-id') ||
+				productIdElement.attr('data-id'),
+				10
+			);
+
+			if (productId > 0) {
+				return productId;
+			}
+		}
+
+		/*
+		* Try an add-to-cart URL.
+		*/
+		const addToCartLink = card.find('a[href*="add-to-cart="]').first();
+
+		if (addToCartLink.length) {
+			const href = addToCartLink.attr('href') || '';
+			const match = href.match(/[?&]add-to-cart=(\d+)/);
+
+			if (match) {
+				return parseInt(match[1], 10);
+			}
+		}
+
+		/*
+		* Try common WordPress product classes.
+		*/
+		const classNames = card.attr('class') || '';
+
+		const classPatterns = [
+			/(?:^|\s)post-(\d+)(?:\s|$)/,
+			/(?:^|\s)product-(\d+)(?:\s|$)/,
+			/(?:^|\s)product_id_(\d+)(?:\s|$)/,
+			/(?:^|\s)product-id-(\d+)(?:\s|$)/,
+			/(?:^|\s)ht-product-(\d+)(?:\s|$)/
+		];
+
+		for (const pattern of classPatterns) {
+			const match = classNames.match(pattern);
+
+			if (match) {
+				return parseInt(match[1], 10);
+			}
+		}
+
+		return 0;
+	}
+
+
+	function getProductUrl(card) {
+		const links = card.find('a[href]').filter(function () {
+			const href = $(this).attr('href') || '';
+
+			if (
+				!href ||
+				href.startsWith('#') ||
+				href.startsWith('javascript:') ||
+				href.includes('add-to-cart=') ||
+				$(this).hasClass('wishlist-heart-btn')
+			) {
+				return false;
 			}
 
-			let productId = 0;
+			try {
+				const url = new URL(href, window.location.href);
 
-			/*
-			 * Most WooCommerce Add to Cart buttons contain
-			 * data-product_id.
-			 */
-			const addToCartButton = card.find(
-				'[data-product_id]'
-			).first();
-
-			if (addToCartButton.length) {
-				productId = parseInt(
-					addToCartButton.attr('data-product_id'),
-					10
+				return (
+					url.origin === window.location.origin &&
+					url.pathname !== window.location.pathname
 				);
+			} catch (error) {
+				return false;
+			}
+		});
+
+		if (!links.length) {
+			return '';
+		}
+
+		try {
+			const url = new URL(links.first().attr('href'), window.location.href);
+			url.hash = '';
+			return url.href;
+		} catch (error) {
+			return '';
+		}
+	}
+
+	function resolveProductIdFromUrl(productUrl) {
+		if (!productUrl) {
+			return $.Deferred().reject().promise();
+		}
+
+		if (resolvedProductUrls.has(productUrl)) {
+			return $.Deferred()
+				.resolve(resolvedProductUrls.get(productUrl))
+				.promise();
+		}
+
+		return $.ajax({
+			url: wishlistData.ajaxUrl,
+			type: 'POST',
+			dataType: 'json',
+			data: {
+				action: 'wishlist_resolve_product_url',
+				nonce: wishlistData.nonce,
+				url: productUrl
+			}
+		}).then(function (response) {
+			if (!response.success || !response.data.product_id) {
+				return $.Deferred().reject().promise();
 			}
 
-			/*
-			 * Fallback: WooCommerce often adds a post ID class,
-			 * such as post-7368.
-			 */
+			const productId = parseInt(response.data.product_id, 10);
+
 			if (!productId) {
-				const classList = card.attr('class') || '';
-				const match = classList.match(/post-(\d+)/);
-
-				if (match) {
-					productId = parseInt(match[1], 10);
-				}
+				return $.Deferred().reject().promise();
 			}
 
-			if (!productId) {
-				return;
-			}
-
-			const heart = `
-				<div class="wishlist-heart-wrapper">
-					<button
-						type="button"
-						class="wishlist-heart-btn"
-						data-product-id="${productId}"
-						aria-pressed="false"
-						aria-label="Add to wishlist"
-					>
-						<span class="wishlist-heart-icon wishlist-heart-empty">
-							<i class="fa-regular fa-heart" aria-hidden="true"></i>
-						</span>
-
-						<span class="wishlist-heart-icon wishlist-heart-filled">
-							<i class="fa-solid fa-heart" aria-hidden="true"></i>
-						</span>
-
-						<span class="wishlist-heart-label">
-							Favorites
-						</span>
-					</button>
-				</div>
-			`;
-
-			card.prepend(heart);
-            const savedProductIds = (
-                wishlistData.wishlist || []
-            ).map(Number);
-
-            if (savedProductIds.includes(productId)) {
-                card
-                    .find(
-                        '.wishlist-heart-btn[data-product-id="' +
-                            productId +
-                        '"]'
-                    )
-                    .addClass('favorited')
-                    .attr('aria-pressed', 'true')
-                    .attr('aria-label', 'Remove from wishlist');
-            }
+			resolvedProductUrls.set(productUrl, productId);
+			return productId;
 		});
 	}
 
-	/*
-	 * Run when the page initially loads.
-	 */
-	addWishlistHearts();
+	function createHeart(productId, isFavorited) {
+		return $(`
+			<div class="wishlist-heart-wrapper" data-wishlist-generated="true">
+				<button
+					type="button"
+					class="wishlist-heart-btn ${isFavorited ? 'favorited' : ''}"
+					data-product-id="${productId}"
+					data-favorited="${isFavorited ? 'true' : 'false'}"
+					aria-pressed="${isFavorited ? 'true' : 'false'}"
+					aria-label="${isFavorited ? 'Remove from wishlist' : 'Add to wishlist'}"
+				>
+					<span class="wishlist-heart-icon wishlist-heart-empty">
+						<i class="fa-regular fa-heart" aria-hidden="true"></i>
+					</span>
+					<span class="wishlist-heart-icon wishlist-heart-filled">
+						<i class="fa-solid fa-heart" aria-hidden="true"></i>
+					</span>
+					<span class="wishlist-heart-label">Favorites</span>
+				</button>
+			</div>
+		`);
+	}
 
-	/*
-	 * Run again when Elementor, filtering, pagination, or AJAX
-	 * dynamically inserts new product cards.
-	 */
-	const observer = new MutationObserver(function () {
-		addWishlistHearts();
-	});
-
-	observer.observe(document.body, {
-		childList: true,
-		subtree: true
-	});
-
-	/*
-	 * Existing wishlist toggle code.
-	 */
-	$(document).on('click', '.wishlist-heart-btn', function (event) {
-		event.preventDefault();
-		event.stopImmediatePropagation();
-		
-		if (!wishlistData.isLoggedIn) {
-    		window.location.href = wishlistData.wishlistUrl;
-    		return;
-    	}
-
-		const button = $(this);
-		const productId = parseInt(
-			button.data('product-id'),
-			10
-		);
-
-		if (!productId || button.hasClass('loading')) {
+	function renderHeartOnCard(card, productId) {
+		if (!productId || card.find('.wishlist-heart-wrapper').length) {
 			return;
 		}
 
-		button.addClass('loading');
+		const isFavorited = getSavedProductIds().includes(productId);
+		const heart = createHeart(productId, isFavorited);
 
-		$.ajax({
+		card.addClass('wishlist-card-has-heart');
+
+		const imageArea = card.find([
+			'.ht-product-image-wrap',
+			'.ht-product-image',
+			'.ht-product-img',
+			'.woolentor-product-thumb',
+			'.woolentor-product-image',
+			'.product-image',
+			'.wl-product-thumb',
+			'.product-thumbnail',
+			'.wc-block-grid__product-image'
+		].join(', ')).first();
+
+		if (imageArea.length) {
+			imageArea.css('position', 'relative');
+			imageArea.prepend(heart);
+			return;
+		}
+
+		const productLink = card.find(
+			'a.woocommerce-LoopProduct-link, a.woocommerce-loop-product__link'
+		).first();
+
+		if (productLink.length) {
+			productLink.before(heart);
+			return;
+		}
+
+		card.css('position', 'relative');
+		card.prepend(heart);
+	}
+
+	function addWishlistHeartToCard(card) {
+		if (
+			!card.length ||
+			card.find('.wishlist-heart-wrapper').length ||
+			card.attr('data-wishlist-resolving') === 'true'
+		) {
+			return;
+		}
+
+		const productId = getProductId(card);
+
+		if (productId) {
+			renderHeartOnCard(card, productId);
+			return;
+		}
+
+		const productUrl = getProductUrl(card);
+
+		if (!productUrl) {
+			return;
+		}
+
+		card.attr('data-wishlist-resolving', 'true');
+
+		resolveProductIdFromUrl(productUrl)
+			.done(function (resolvedProductId) {
+				renderHeartOnCard(card, resolvedProductId);
+			})
+			.always(function () {
+				card.removeAttr('data-wishlist-resolving');
+			});
+	}
+
+	function addWishlistHearts(root) {
+		const scope = root ? $(root) : $(document);
+		const cards = scope.is(CARD_SELECTOR)
+			? scope.add(scope.find(CARD_SELECTOR))
+			: scope.find(CARD_SELECTOR);
+
+		cards.each(function () {
+			addWishlistHeartToCard($(this));
+		});
+	}
+
+	function scheduleHeartScan(root) {
+		window.clearTimeout(observerTimer);
+		observerTimer = window.setTimeout(function () {
+			addWishlistHearts(root || document);
+		}, 40);
+	}
+
+	function updateWishlistData(productId, isFavorited) {
+		const ids = getSavedProductIds().filter(function (id) {
+			return id !== productId;
+		});
+
+		if (isFavorited) {
+			ids.push(productId);
+		}
+
+		wishlistData.wishlist = ids;
+	}
+
+	function updateProductState(productId, isFavorited, count) {
+		const allControls = $(
+			'.wishlist-heart-btn[data-product-id="' + productId + '"], ' +
+			'.js-wishlist-product-button[data-product-id="' + productId + '"]'
+		);
+
+		allControls
+			.toggleClass('favorited', isFavorited)
+			.attr('data-favorited', isFavorited ? 'true' : 'false')
+			.attr('aria-pressed', isFavorited ? 'true' : 'false')
+			.attr(
+				'aria-label',
+				isFavorited ? 'Remove from wishlist' : 'Add to wishlist'
+			);
+
+		$('.js-wishlist-product-button[data-product-id="' + productId + '"]')
+			.text(isFavorited ? 'Remove from Wishlist' : 'Add to Wishlist');
+
+		$('.wishlist-count')
+			.text(count)
+			.toggleClass('is-empty', count === 0);
+
+		updateWishlistData(productId, isFavorited);
+
+		if (!isFavorited) {
+			$('.wishlist-remove-button[data-product-id="' + productId + '"]')
+				.closest('.wishlist-product')
+				.fadeOut(200, function () {
+					$(this).remove();
+
+					if ($('.wishlist-product').length === 0) {
+						window.location.reload();
+					}
+				});
+		}
+	}
+
+	function toggleWishlist(productId) {
+		if (pendingRequests.has(productId)) {
+			return pendingRequests.get(productId);
+		}
+
+		const controls = $(
+			'.wishlist-heart-btn[data-product-id="' + productId + '"], ' +
+			'.js-wishlist-product-button[data-product-id="' + productId + '"]'
+		);
+
+		controls.addClass('loading').prop('disabled', true);
+
+		const request = $.ajax({
 			url: wishlistData.ajaxUrl,
 			type: 'POST',
 			dataType: 'json',
@@ -141,82 +375,89 @@ jQuery(function ($) {
 				product_id: productId
 			}
 		})
-			.done(function (response) {
-				if (!response.success) {
-					alert(
-						response.data ||
-						'Something went wrong.'
-					);
+		.done(function (response) {
+			if (!response.success) {
+				alert(response.data || 'Something went wrong.');
+				return;
+			}
 
-					return;
-				}
+			if (Array.isArray(response.data.wishlist)) {
+				wishlistData.wishlist = response.data.wishlist.map(Number);
+			}
 
-				const isFavorited =
-					response.data.is_favorited;
+			updateProductState(
+				productId,
+				Boolean(response.data.is_favorited),
+				parseInt(response.data.count, 10) || 0
+			);
+		})
+		.fail(function (xhr) {
+			const message =
+				xhr.responseJSON && xhr.responseJSON.data
+					? xhr.responseJSON.data
+					: 'The wishlist could not be updated.';
 
-				const count =
-					parseInt(response.data.count, 10) || 0;
+			alert(message);
+		})
+		.always(function () {
+			pendingRequests.delete(productId);
+			controls.removeClass('loading').prop('disabled', false);
+		});
 
-				const matchingButtons = $(
-					'.wishlist-heart-btn[data-product-id="' +
-						productId +
-					'"]'
-				);
+		pendingRequests.set(productId, request);
+		return request;
+	}
 
-				matchingButtons
-					.toggleClass(
-						'favorited',
-						isFavorited
-					)
-					.attr(
-						'aria-pressed',
-						isFavorited
-							? 'true'
-							: 'false'
-					)
-					.attr(
-						'aria-label',
-						isFavorited
-							? 'Remove from wishlist'
-							: 'Add to wishlist'
-					);
+	addWishlistHearts(document);
 
-				$('.wishlist-count')
-					.text(count)
-					.toggleClass(
-						'is-empty',
-						count === 0
-					);
+	const observer = new MutationObserver(function (mutations) {
+		let shouldScan = false;
 
-				if (
-					!isFavorited &&
-					button.hasClass(
-						'wishlist-remove-button'
-					)
-				) {
-					button
-						.closest('.wishlist-product')
-						.fadeOut(200, function () {
-							$(this).remove();
+		mutations.forEach(function (mutation) {
+			if (mutation.addedNodes && mutation.addedNodes.length) {
+				shouldScan = true;
+			}
+		});
 
-							if (
-								$('.wishlist-product')
-									.length === 0
-							) {
-								window.location.reload();
-							}
-						});
-				}
-			})
-			.fail(function () {
-				alert(
-					'The wishlist could not be updated.'
-				);
-			})
-			.always(function () {
-				button.removeClass('loading');
-			});
+		if (shouldScan) {
+			scheduleHeartScan(document);
+		}
 	});
+
+	observer.observe(document.body, {
+		childList: true,
+		subtree: true
+	});
+
+	$(document).on(
+		'found_variation wc_fragments_refreshed updated_wc_div ' +
+		'woocommerce_variation_has_changed',
+		function () {
+			scheduleHeartScan(document);
+		}
+	);
+
+	$(document).on(
+		'click',
+		'.wishlist-heart-btn, .js-wishlist-product-button',
+		function (event) {
+			event.preventDefault();
+			event.stopPropagation();
+			event.stopImmediatePropagation();
+
+			if (!wishlistData.isLoggedIn) {
+				window.location.assign(wishlistData.wishlistUrl);
+				return;
+			}
+
+			const productId = parseInt($(this).attr('data-product-id'), 10);
+			if (!productId) {
+				return;
+			}
+
+			toggleWishlist(productId);
+		}
+	);
 
 	// Share functionality
 	$(document).on('change', '#wishlist_public_toggle', function() {
@@ -261,6 +502,20 @@ jQuery(function ($) {
 		} catch (err) {
 			alert('Please copy the URL manually.');
 		}
+	});
+
+	$(document).on('click', '.wishlist-sticky-share', function (event) {
+		event.preventDefault();
+		event.stopPropagation();
+
+		const shareUrl = $(this).attr('data-share-url');
+
+		if (!shareUrl) {
+			alert('A public wishlist link could not be found.');
+			return;
+		}
+
+		window.wishlistShareWishlist(shareUrl);
 	});
 
 	// Share wishlist function with Pinterest image support
@@ -421,11 +676,15 @@ jQuery(function ($) {
 			sharePopup.remove();
 		});
 		
-		$(document).on('click', function(e) {
-			if (!$(e.target).closest('.wishlist-share-popup').length && 
-				!$(e.target).closest('.wishlist-sticky-share').length) {
-				sharePopup.remove();
-			}
+		$(document)
+			.off('click.wishlistSharePopup')
+			.on('click.wishlistSharePopup', function (event) {
+				if (
+					!$(event.target).closest('.wishlist-share-popup').length &&
+					!$(event.target).closest('.wishlist-sticky-share').length
+				) {
+					$('.wishlist-share-popup').remove();
+				}
 		});
 		
 		// Copy URL functionality
@@ -444,65 +703,4 @@ jQuery(function ($) {
 			}
 		});
 	};
-
-	// Single product page wishlist button toggle
-	$(document).on('click', '.js-wishlist-product-button', function(event) {
-		event.preventDefault();
-		
-		if (!wishlistData.isLoggedIn) {
-			window.location.href = wishlistData.wishlistUrl;
-			return;
-		}
-		
-		const button = $(this);
-		const productId = parseInt(button.data('product-id'), 10);
-		
-		if (!productId || button.hasClass('loading')) {
-			return;
-		}
-		
-		button.addClass('loading');
-		
-		$.ajax({
-			url: wishlistData.ajaxUrl,
-			type: 'POST',
-			dataType: 'json',
-			data: {
-				action: 'wishlist_toggle',
-				nonce: wishlistData.nonce,
-				product_id: productId
-			}
-		})
-		.done(function(response) {
-			if (!response.success) {
-				alert(response.data || 'Something went wrong.');
-				return;
-			}
-			
-			const isFavorited = response.data.is_favorited;
-			const count = parseInt(response.data.count, 10) || 0;
-			
-			// Update button text
-			button.text(isFavorited ? 'Remove from Wishlist' : 'Add to Wishlist');
-			button.toggleClass('favorited', isFavorited);
-			
-			// Update heart icon on product card if it exists
-			const matchingButtons = $('.wishlist-heart-btn[data-product-id="' + productId + '"]');
-			matchingButtons
-				.toggleClass('favorited', isFavorited)
-				.attr('aria-pressed', isFavorited ? 'true' : 'false')
-				.attr('aria-label', isFavorited ? 'Remove from wishlist' : 'Add to wishlist');
-			
-			// Update wishlist count
-			$('.wishlist-count')
-				.text(count)
-				.toggleClass('is-empty', count === 0);
-		})
-		.fail(function() {
-			alert('The wishlist could not be updated.');
-		})
-		.always(function() {
-			button.removeClass('loading');
-		});
-	});
 });

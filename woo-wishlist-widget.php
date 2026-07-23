@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WooCommerce Wishlist Widget - Favorite Products And More
  * Description: A WooCommerce add-on that allows customers to wishlist products via a widget.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Requires Plugins: woocommerce
  * Author: Connor Bryant
  * License: GPLv2 or later
@@ -50,28 +50,32 @@ add_action( 'plugins_loaded', 'wishlist_init' );
  * Initialize the plugin's WooCommerce functionality
  */
 function wishlist_init() {
-	if ( ! class_exists( 'WooCommerce' ) ) {
-		return;
-	}
+    if ( ! class_exists( 'WooCommerce' ) ) {
+        return;
+    }
 
-	add_action( 'wp_enqueue_scripts', 'wishlist_enqueue_assets' );
+    add_action( 'wp_enqueue_scripts', 'wishlist_enqueue_assets' );
 
-	add_action( 'init', 'wishlist_register_endpoint' );
-	
-	// Public endpoint registration
-	add_action( 'init', 'wishlist_register_public_endpoint' );
+    add_action( 'init', 'wishlist_register_endpoint' );
+    
+    // Public endpoint registration
+    add_action( 'init', 'wishlist_register_public_endpoint' );
 
-	add_filter( 'woocommerce_account_menu_items', 'wishlist_add_menu_item' );
+    add_filter( 'woocommerce_account_menu_items', 'wishlist_add_menu_item' );
 
-	add_action( 'woocommerce_account_wishlist_endpoint', 'wishlist_endpoint_content' );
+    add_action( 'woocommerce_account_wishlist_endpoint', 'wishlist_endpoint_content' );
 
-	add_action( 'woocommerce_after_add_to_cart_button', 'wishlist_product_button' );
+    add_action( 'woocommerce_after_add_to_cart_button', 'wishlist_product_button' );
 
+    // Standard WooCommerce product loops.
+    // JavaScript provides the fallback for builders that do not run this hook.
     add_action( 'woocommerce_before_shop_loop_item_title', 'wishlist_add_heart_to_product_card', 5 );
 
     add_action( 'wp_footer', 'wishlist_widget' );
 
     add_action( 'wp_ajax_wishlist_toggle', 'wishlist_ajax_toggle' );
+    add_action( 'wp_ajax_wishlist_resolve_product_url', 'wishlist_ajax_resolve_product_url' );
+    add_action( 'wp_ajax_nopriv_wishlist_resolve_product_url', 'wishlist_ajax_resolve_product_url' );
     
     add_action( 'woocommerce_before_customer_login_form', 'wishlist_login_notice' );
     
@@ -131,7 +135,7 @@ function wishlist_public_template_include( $template ) {
  * Enqueue frontend scripts and styles
  */
 function wishlist_enqueue_assets() {
-	$version = '1.0.0';
+	$version = '1.1.0';
 
 	wp_enqueue_style(
 		'wishlist-mode-style',
@@ -163,6 +167,7 @@ function wishlist_enqueue_assets() {
     		'nonce'        => wp_create_nonce( 'wishlist_nonce' ),
     		'isLoggedIn'   => is_user_logged_in(),
     		'wishlistUrl'  => wc_get_account_endpoint_url( 'wishlist' ),
+			'wishlist'     => is_user_logged_in() ? wishlist_get_user_wishlist() : array(),
     	)
     );
 }
@@ -491,9 +496,9 @@ function wishlist_widget() {
         <!-- Share Button - Only show if public AND has items -->
         <?php if ( $show_share ) : ?>
             <button
-                type="button"
-                class="wishlist-sticky-share"
-                onclick="wishlistShareWishlist('<?php echo esc_url( $share_url ); ?>')"
+				type="button"
+				class="wishlist-sticky-share"
+				data-share-url="<?php echo esc_url( $share_url ); ?>"
                 aria-label="<?php esc_attr_e( 'Share wishlist', 'woocommerce-wishlist-widget' ); ?>"
                 title="<?php esc_attr_e( 'Share your wishlist', 'woocommerce-wishlist-widget' ); ?>"
             >
@@ -543,7 +548,7 @@ function wishlist_ajax_toggle(){
     }
 
     $wishlist = wishlist_get_user_wishlist();
-    $is_favorited = in_array($product_id, $wishlist);
+    $is_favorited = in_array( $product_id, $wishlist, true );
 
     if ($is_favorited){
         $wishlist = array_diff($wishlist, [$product_id]);
@@ -559,70 +564,107 @@ function wishlist_ajax_toggle(){
         'action' => $action,
         'count' => count($wishlist),
         'product_id' => $product_id,
-        'is_favorited' => ! $is_favorited
+        'is_favorited' => ! $is_favorited,
+        'wishlist' => array_values($wishlist) // ADD THIS LINE - return full wishlist
     ]);
+}
+
+
+/**
+ * Resolve a local product permalink to a WooCommerce product ID.
+ *
+ * WooLentor's Universal Product widget does not always include a product ID
+ * in its card markup, so the JavaScript fallback sends the product permalink
+ * here when necessary.
+ */
+function wishlist_ajax_resolve_product_url() {
+    check_ajax_referer( 'wishlist_nonce', 'nonce' );
+
+    $url = isset( $_POST['url'] ) ? esc_url_raw( wp_unslash( $_POST['url'] ) ) : '';
+
+    if ( empty( $url ) ) {
+        wp_send_json_error( 'Missing product URL.' );
+    }
+
+    $home_host = wp_parse_url( home_url(), PHP_URL_HOST );
+    $url_host  = wp_parse_url( $url, PHP_URL_HOST );
+
+    if ( ! $home_host || ! $url_host || strtolower( $home_host ) !== strtolower( $url_host ) ) {
+        wp_send_json_error( 'Invalid product URL.' );
+    }
+
+    $product_id = url_to_postid( $url );
+
+    /*
+     * Some permalink structures or builder-generated URLs are not resolved by
+     * url_to_postid(). Fall back to the final path segment as the product slug.
+     */
+    if ( ! $product_id ) {
+        $path = trim( (string) wp_parse_url( $url, PHP_URL_PATH ), '/' );
+        $slug = basename( $path );
+
+        if ( $slug ) {
+            $product_post = get_page_by_path( sanitize_title( $slug ), OBJECT, 'product' );
+
+            if ( $product_post instanceof WP_Post ) {
+                $product_id = (int) $product_post->ID;
+            }
+        }
+    }
+
+    $product = $product_id ? wc_get_product( $product_id ) : false;
+
+    if ( ! $product ) {
+        wp_send_json_error( 'Product could not be resolved.' );
+    }
+
+    wp_send_json_success(
+        array(
+            'product_id' => $product->get_id(),
+        )
+    );
 }
 
 /**
  * Add the wishlist heart to WooCommerce product cards.
+ * This works with both standard WooCommerce and Woolentor
  */
 function wishlist_add_heart_to_product_card() {
-	global $product;
+    global $product;
 
-	if ( ! $product instanceof WC_Product ) {
-		return;
-	}
-
-	$product_id  = $product->get_id();
-	$wishlist     = is_user_logged_in()
-    	? wishlist_get_user_wishlist()
-    	: array();
-    
-    $is_favorited = in_array(
-    	$product->get_id(),
-    	$wishlist,
-    	true
-    );
-    
-    // Check if product image has square aspect ratio
-    $image_id = $product->get_image_id();
-    $is_square = false;
-    if ($image_id) {
-        $image_data = wp_get_attachment_image_src($image_id, 'woocommerce_thumbnail');
-        if ($image_data) {
-            $width = $image_data[1];
-            $height = $image_data[2];
-            // Check if image is square (or close to it)
-            $is_square = ($width == $height);
-        }
+    if ( ! $product instanceof WC_Product ) {
+        return;
     }
+
+    $product_id   = $product->get_id();
+    $wishlist     = is_user_logged_in() ? wishlist_get_user_wishlist() : array();
+    $is_favorited = in_array( $product_id, $wishlist, true );
     ?>
-	<div class="wishlist-heart-wrapper" data-square="<?php echo $is_square ? 'true' : 'false'; ?>">
-		<button
-			type="button"
-			class="wishlist-heart-btn<?php echo $is_favorited ? ' favorited' : ''; ?>"
-			data-product-id="<?php echo esc_attr( $product_id ); ?>"
-			aria-pressed="<?php echo $is_favorited ? 'true' : 'false'; ?>"
-			aria-label="<?php echo esc_attr(
-				$is_favorited
-					? __( 'Remove from wishlist', 'woocommerce-wishlist-widget' )
-					: __( 'Add to wishlist', 'woocommerce-wishlist-widget' )
-			); ?>"
-		>
-			<span class="wishlist-heart-icon wishlist-heart-empty">
-				<i class="fa-regular fa-heart" aria-hidden="true"></i>
-			</span>
-
-			<span class="wishlist-heart-icon wishlist-heart-filled">
-				<i class="fa-solid fa-heart" aria-hidden="true"></i>
-			</span>
-
-			<span class="wishlist-heart-label">
-				<?php esc_html_e( 'Favorites', 'woocommerce-wishlist-widget' ); ?>
-			</span>
-		</button>
-	</div>
-	<?php
+    <div class="wishlist-heart-wrapper">
+        <button
+            type="button"
+            class="wishlist-heart-btn<?php echo $is_favorited ? ' favorited' : ''; ?>"
+            data-product-id="<?php echo esc_attr( $product_id ); ?>"
+            data-favorited="<?php echo $is_favorited ? 'true' : 'false'; ?>"
+            aria-pressed="<?php echo $is_favorited ? 'true' : 'false'; ?>"
+            aria-label="<?php echo esc_attr(
+                $is_favorited
+                    ? __( 'Remove from wishlist', 'woocommerce-wishlist-widget' )
+                    : __( 'Add to wishlist', 'woocommerce-wishlist-widget' )
+            ); ?>"
+        >
+            <span class="wishlist-heart-icon wishlist-heart-empty">
+                <i class="fa-regular fa-heart" aria-hidden="true"></i>
+            </span>
+            <span class="wishlist-heart-icon wishlist-heart-filled">
+                <i class="fa-solid fa-heart" aria-hidden="true"></i>
+            </span>
+            <span class="wishlist-heart-label">
+                <?php esc_html_e( 'Favorites', 'woocommerce-wishlist-widget' ); ?>
+            </span>
+        </button>
+    </div>
+    <?php
 }
 
 /**
@@ -890,6 +932,52 @@ function wishlist_ajax_toggle_public() {
         'is_public' => $is_public,
         'share_url' => home_url( '/wishlist/' . get_user_meta( $user_id, '_wishlist_share_key', true ) . '/' )
     ) );
+}
+
+/**
+ * Add the wishlist heart - fallback for Woolentor and other page builders
+ */
+function wishlist_add_heart_to_product_card_after() {
+    global $product;
+    
+    if ( ! $product instanceof WC_Product ) {
+        return;
+    }
+    
+    // Check if heart already exists on this product
+    if ( has_action( 'woocommerce_before_shop_loop_item_title', 'wishlist_add_heart_to_product_card' ) ) {
+        return;
+    }
+    
+    $product_id = $product->get_id();
+    $wishlist = is_user_logged_in() ? wishlist_get_user_wishlist() : array();
+    $is_favorited = in_array($product_id, $wishlist, true);
+    ?>
+    <div class="wishlist-heart-wrapper" style="position: absolute; top: 10px; right: 10px; z-index: 10;">
+        <button
+            type="button"
+            class="wishlist-heart-btn<?php echo $is_favorited ? ' favorited' : ''; ?>"
+            data-product-id="<?php echo esc_attr( $product_id ); ?>"
+            data-favorited="<?php echo $is_favorited ? 'true' : 'false'; ?>"
+            aria-pressed="<?php echo $is_favorited ? 'true' : 'false'; ?>"
+            aria-label="<?php echo esc_attr(
+                $is_favorited
+                    ? __( 'Remove from wishlist', 'woocommerce-wishlist-widget' )
+                    : __( 'Add to wishlist', 'woocommerce-wishlist-widget' )
+            ); ?>"
+        >
+            <span class="wishlist-heart-icon wishlist-heart-empty">
+                <i class="fa-regular fa-heart" aria-hidden="true"></i>
+            </span>
+            <span class="wishlist-heart-icon wishlist-heart-filled">
+                <i class="fa-solid fa-heart" aria-hidden="true"></i>
+            </span>
+            <span class="wishlist-heart-label">
+                <?php esc_html_e( 'Favorites', 'woocommerce-wishlist-widget' ); ?>
+            </span>
+        </button>
+    </div>
+    <?php
 }
 
 /**
