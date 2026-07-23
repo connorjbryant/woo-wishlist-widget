@@ -92,7 +92,8 @@
     align-items: center;
     background: #ff1f1f;
     border-radius: 14px 0 0 14px;
-    padding: 16px 12px;
+    padding: 0.5rem;
+    gap: 1rem;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
     transition: all 0.25s ease;
 }
@@ -161,14 +162,11 @@
     justify-content: center;
     width: 32px;
     height: 32px;
-    background: transparent;
     color: rgba(255, 255, 255, 0.7);
-    border-radius: 50%;
     cursor: pointer;
-    transition: all 0.25s ease;
-    font-size: 14px;
-    margin-top: 4px;
-    position: relative;
+    font-size: 1rem;
+    padding: 0;
+    background-color: transparent;
 }
 
 .wishlist-sticky-share:hover,
@@ -668,8 +666,8 @@
 
     /* Sticky sidebar - smaller on mobile */
     .wishlist-sticky-wrapper {
-        padding: 12px 10px;
-        gap: 6px;
+        padding: 1rem;
+        gap: 1rem;
     }
     
     .wishlist-sticky-icon {
@@ -677,14 +675,14 @@
     }
     
     .wishlist-sticky-tab .wishlist-count {
-        font-size: 12px;
+        font-size: 1rem;
         min-width: 16px;
     }
     
     .wishlist-sticky-share {
         width: 28px;
         height: 28px;
-        font-size: 12px;
+        font-size: 1rem;
     }
     
     /* Hide tooltips on mobile */
@@ -833,7 +831,8 @@
 
 @media (max-width: 480px) {
     .wishlist-sticky-wrapper {
-        padding: 10px 8px;
+        padding: 1rem;
+        gap: 1rem;;
     }
     
     .wishlist-sticky-icon {
@@ -841,14 +840,14 @@
     }
     
     .wishlist-sticky-tab .wishlist-count {
-        font-size: 10px;
+        font-size: 1rem;
         min-width: 14px;
     }
     
     .wishlist-sticky-share {
         width: 24px;
         height: 24px;
-        font-size: 10px;
+        font-size: 1rem;
     }
     
     /* Even smaller product cards */
