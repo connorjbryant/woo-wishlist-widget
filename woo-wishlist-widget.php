@@ -80,6 +80,60 @@ function wishlist_init() {
     
     // Add the share section to the wishlist endpoint
     add_action( 'woocommerce_account_wishlist_endpoint', 'wishlist_add_share_section_to_endpoint', 5 );
+    
+    // Add template filter for public wishlist - THIS REPLACES template_redirect
+    add_filter( 'template_include', 'wishlist_public_template_include', 99 );
+}
+
+/**
+ * Handle public wishlist viewing using template hierarchy
+ */
+function wishlist_public_template_include( $template ) {
+    global $wp_query;
+    
+    // Check if this is a public wishlist request
+    if ( isset( $wp_query->query_vars['wishlist_public'] ) ) {
+        $wishlist_key = $wp_query->query_vars['wishlist_public'];
+        
+        // Find user by wishlist key
+        $user_id = wishlist_get_user_by_share_key( $wishlist_key );
+        
+        if ( ! $user_id ) {
+            wp_die( 'Wishlist not found.', 'Wishlist Not Found', array( 'response' => 404 ) );
+        }
+        
+        // Check if user has made their wishlist public
+        $is_public = get_user_meta( $user_id, '_wishlist_public', true );
+        
+        if ( ! $is_public || $is_public !== 'yes' ) {
+            wp_die( 'This wishlist is private.', 'Private Wishlist', array( 'response' => 403 ) );
+        }
+        
+        // Set query var for template
+        set_query_var( 'wishlist_user_id', $user_id );
+        
+        // Look for template in this order:
+        // 1. Theme: /themes/their-theme/woocommerce-wishlist-widget/public-wishlist.php
+        // 2. Plugin: /plugins/woocommerce-wishlist-widget/templates/public-wishlist.php
+        
+        // Check if theme has a custom template
+        $theme_template = locate_template( 'woocommerce-wishlist-widget/public-wishlist.php' );
+        
+        if ( $theme_template ) {
+            return $theme_template;
+        }
+        
+        // Use plugin template
+        $plugin_template = plugin_dir_path( __FILE__ ) . 'templates/public-wishlist.php';
+        if ( file_exists( $plugin_template ) ) {
+            return $plugin_template;
+        }
+        
+        // Fallback if no template found
+        wp_die( 'Wishlist template not found.', 'Template Error', array( 'response' => 500 ) );
+    }
+    
+    return $template;
 }
 
 /**
@@ -637,37 +691,6 @@ function wishlist_public_query_vars( $vars ) {
 }
 
 /**
- * Handle public wishlist viewing
- */
-add_action( 'template_redirect', 'wishlist_public_template' );
-
-function wishlist_public_template() {
-    $wishlist_key = get_query_var( 'wishlist_public' );
-    
-    if ( empty( $wishlist_key ) ) {
-        return;
-    }
-    
-    // Find user by wishlist key
-    $user_id = wishlist_get_user_by_share_key( $wishlist_key );
-    
-    if ( ! $user_id ) {
-        wp_die( 'Wishlist not found or is private.', 'Wishlist Not Found', array( 'response' => 404 ) );
-    }
-    
-    // Check if user has made their wishlist public
-    $is_public = get_user_meta( $user_id, '_wishlist_public', true );
-    
-    if ( ! $is_public ) {
-        wp_die( 'This wishlist is private.', 'Private Wishlist', array( 'response' => 403 ) );
-    }
-    
-    // Display the public wishlist
-    wishlist_display_public_wishlist( $user_id );
-    exit;
-}
-
-/**
  * Get user by wishlist share key
  */
 function wishlist_get_user_by_share_key( $share_key ) {
@@ -700,99 +723,25 @@ function wishlist_generate_share_key( $user_id ) {
 }
 
 /**
- * Display public wishlist
+ * Display public wishlist using template
  */
 function wishlist_display_public_wishlist( $user_id ) {
-    $user = get_userdata( $user_id );
-    $wishlist = get_user_meta( $user_id, '_wishlist_products', true );
-    $wishlist = is_array( $wishlist ) ? $wishlist : [];
+    // Set the query var for the template
+    set_query_var( 'wishlist_user_id', $user_id );
     
-    get_header();
-    ?>
-    <div class="wishlist-public-container">
-        <div class="wishlist-public-header">
-            <h1>
-                <?php 
-                printf(
-                    esc_html__( '%s\'s Wishlist', 'woocommerce-wishlist-widget' ),
-                    esc_html( $user->display_name )
-                );
-                ?>
-            </h1>
-        </div>
-        
-        <?php if ( empty( $wishlist ) ) : ?>
-            <div class="wishlist-empty">
-                <p><?php esc_html_e( 'This wishlist is empty.', 'woocommerce-wishlist-widget' ); ?></p>
-            </div>
-        <?php else : ?>
-            <div class="wishlist-products">
-                <?php
-                foreach ( $wishlist as $product_id ) {
-                    $product = wc_get_product( $product_id );
-                    
-                    if ( ! $product || ! $product->is_visible() ) {
-                        continue;
-                    }
-                    
-                    $product_url = $product->get_permalink();
-                    ?>
-                    <div class="wishlist-product">
-                        <a class="wishlist-product-image" href="<?php echo esc_url( $product_url ); ?>">
-                            <?php echo wp_kses_post( $product->get_image() ); ?>
-                        </a>
-                        
-                        <div class="wishlist-product-information">
-                            <a href="<?php echo esc_url( $product_url ); ?>">
-                                <strong><?php echo esc_html( $product->get_name() ); ?></strong>
-                            </a>
-                            
-                            <?php if ( $product->get_sku() ) : ?>
-                                <span class="wishlist-product-sku">
-                                    <?php
-                                    printf(
-                                        esc_html__( 'SKU: %s', 'woocommerce-wishlist-widget' ),
-                                        esc_html( $product->get_sku() )
-                                    );
-                                    ?>
-                                </span>
-                            <?php endif; ?>
-                        </div>
-                        
-                        <div class="wishlist-product-price">
-                            <?php echo wp_kses_post( $product->get_price_html() ); ?>
-                        </div>
-                        
-                        <div class="wishlist-product-cart">
-                            <?php
-                            if ( $product->is_purchasable() && $product->is_in_stock() ) :
-                                ?>
-                                <a
-                                    href="<?php echo esc_url( $product->add_to_cart_url() ); ?>"
-                                    class="button add_to_cart_button ajax_add_to_cart"
-                                    data-product_id="<?php echo esc_attr( $product_id ); ?>"
-                                    data-product_sku="<?php echo esc_attr( $product->get_sku() ); ?>"
-                                    data-quantity="1"
-                                    aria-label="<?php echo esc_attr( $product->add_to_cart_description() ); ?>"
-                                    rel="nofollow"
-                                >
-                                    <?php echo esc_html( $product->add_to_cart_text() ); ?>
-                                </a>
-                            <?php else : ?>
-                                <span class="wishlist-product-unavailable">
-                                    <?php esc_html_e( 'Currently unavailable', 'woocommerce-wishlist-widget' ); ?>
-                                </span>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    <?php
-                }
-                ?>
-            </div>
-        <?php endif; ?>
-    </div>
-    <?php
-    get_footer();
+    // Path to the template file
+    $template_path = plugin_dir_path( __FILE__ ) . 'templates/public-wishlist.php';
+    
+    // Check if template exists
+    if ( file_exists( $template_path ) ) {
+        // Include the template
+        include $template_path;
+    } else {
+        // Fallback if template doesn't exist
+        wp_die( 'Wishlist template not found.', 'Template Error', array( 'response' => 500 ) );
+    }
+    
+    exit;
 }
 
 /**
