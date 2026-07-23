@@ -429,7 +429,7 @@ function wishlist_product_button() {
 	<button 
 		type="button" 
 		style="margin-left: 0.5rem;" 
-		class="button wishlist-product-button<?php echo $is_favorited ? ' favorited' : ''; ?>" 
+		class="single_add_to_cart_button button alt js-wishlist-product-button<?php echo $is_favorited ? ' favorited' : ''; ?>" 
 		data-product-id="<?php echo esc_attr($product_id); ?>"
 		aria-pressed="<?php echo $is_favorited ? 'true' : 'false'; ?>"
 	>

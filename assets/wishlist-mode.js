@@ -446,7 +446,7 @@ jQuery(function ($) {
 	};
 
 	// Single product page wishlist button toggle
-	$(document).on('click', '.wishlist-product-button', function(event) {
+	$(document).on('click', '.js-wishlist-product-button', function(event) {
 		event.preventDefault();
 		
 		if (!wishlistData.isLoggedIn) {
