@@ -39,6 +39,10 @@
     color: white !important;
 }
 
+.wishlist-sticky-tab:focus {
+    color: white !important;
+}
+
 .wishlist-sticky-icon {
     font-size: 28px;
 }

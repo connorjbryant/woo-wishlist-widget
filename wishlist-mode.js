@@ -113,6 +113,11 @@ jQuery(function ($) {
 	$(document).on('click', '.wishlist-heart-btn', function (event) {
 		event.preventDefault();
 		event.stopImmediatePropagation();
+		
+		if (!wishlistData.isLoggedIn) {
+    		window.location.href = wishlistData.wishlistUrl;
+    		return;
+    	}
 
 		const button = $(this);
 		const productId = parseInt(
