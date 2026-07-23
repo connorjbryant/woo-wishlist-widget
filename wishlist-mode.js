@@ -217,4 +217,216 @@ jQuery(function ($) {
 				button.removeClass('loading');
 			});
 	});
+
+	// Share functionality
+	$(document).on('change', '#wishlist_public_toggle', function() {
+		const isPublic = $(this).is(':checked') ? 'yes' : 'no';
+		const userId = $(this).data('user-id');
+		
+		$.ajax({
+			url: wishlistData.ajaxUrl,
+			type: 'POST',
+			dataType: 'json',
+			data: {
+				action: 'wishlist_toggle_public',
+				nonce: wishlistData.nonce,
+				is_public: isPublic
+			}
+		})
+		.done(function(response) {
+			if (response.success) {
+				$('.wishlist-share-url-wrapper').toggle(isPublic === 'yes');
+				$('.wishlist-share-status').text(
+					isPublic === 'yes' ? 'Public' : 'Private'
+				);
+				
+				if (isPublic === 'yes') {
+					$('#wishlist_share_url').val(response.data.share_url);
+				}
+			}
+		})
+		.fail(function() {
+			alert('Could not update wishlist privacy settings.');
+		});
+	});
+
+	// Copy URL functionality
+	$(document).on('click', '.wishlist-copy-url', function() {
+		const input = $('#wishlist_share_url');
+		input.select();
+		
+		try {
+			document.execCommand('copy');
+			alert('Link copied to clipboard!');
+		} catch (err) {
+			alert('Please copy the URL manually.');
+		}
+	});
+
+	// Share wishlist function with Pinterest image support
+	window.wishlistShareWishlist = function(shareUrl) {
+		// Get the first product image from the wishlist for Pinterest
+		var firstImage = '';
+		var productImages = $('.wishlist-product-image img, .wishlist-public-container .wishlist-product-image img');
+		
+		if (productImages.length > 0) {
+			// Get the actual image URL
+			var imgSrc = productImages.first().attr('src');
+			if (imgSrc) {
+				// Make sure it's a full URL
+				if (imgSrc.startsWith('//')) {
+					imgSrc = 'https:' + imgSrc;
+				} else if (imgSrc.startsWith('/')) {
+					imgSrc = window.location.origin + imgSrc;
+				}
+				firstImage = encodeURIComponent(imgSrc);
+			}
+		}
+		
+		// If no product image found, try to get from product cards on the page
+		if (!firstImage) {
+			var productCardImages = $('.product img, .ht-product img, li.product img').first();
+			if (productCardImages.length > 0) {
+				var imgSrc = productCardImages.attr('src');
+				if (imgSrc) {
+					if (imgSrc.startsWith('//')) {
+						imgSrc = 'https:' + imgSrc;
+					} else if (imgSrc.startsWith('/')) {
+						imgSrc = window.location.origin + imgSrc;
+					}
+					firstImage = encodeURIComponent(imgSrc);
+				}
+			}
+		}
+		
+		// Fallback to site icon or logo
+		if (!firstImage) {
+			var siteIcon = $('link[rel="icon"]').attr('href') || 
+						  $('link[rel="apple-touch-icon"]').attr('href') ||
+						  $('link[rel="shortcut icon"]').attr('href') ||
+						  '';
+			if (siteIcon) {
+				if (siteIcon.startsWith('//')) {
+					siteIcon = 'https:' + siteIcon;
+				} else if (siteIcon.startsWith('/')) {
+					siteIcon = window.location.origin + siteIcon;
+				}
+				firstImage = encodeURIComponent(siteIcon);
+			}
+		}
+		
+		// Ultimate fallback - use a default image
+		if (!firstImage) {
+			firstImage = encodeURIComponent('https://via.placeholder.com/300x300/ff1f1f/ffffff?text=Wishlist');
+		}
+		
+		// Use native share API if available (mobile)
+		if (navigator.share) {
+			navigator.share({
+				title: 'My Wishlist',
+				text: 'Check out my wishlist!',
+				url: shareUrl
+			}).catch(function(error) {
+				if (error.name !== 'AbortError') {
+					console.log('Share cancelled:', error);
+				}
+			});
+			return;
+		}
+		
+		// Desktop: Show popup near the share button
+		var existingPopup = $('.wishlist-share-popup');
+		if (existingPopup.length) {
+			existingPopup.remove();
+			return;
+		}
+		
+		var sharePopup = $('<div class="wishlist-share-popup"></div>');
+		sharePopup.html(`
+			<div class="wishlist-share-popup-content">
+				<div class="wishlist-share-popup-header">
+					<span>Share Wishlist</span>
+					<button class="wishlist-share-popup-close">&times;</button>
+				</div>
+				<div class="wishlist-share-popup-body">
+					<div class="wishlist-share-popup-url">
+						<input type="text" value="${shareUrl}" readonly onclick="this.select();">
+						<button class="button wishlist-copy-url-small">Copy</button>
+					</div>
+					<div class="wishlist-share-popup-social">
+						<a href="mailto:?subject=${encodeURIComponent('Check out my wishlist!')}&body=${encodeURIComponent('Here\'s my wishlist: ' + shareUrl)}" target="_blank" class="wishlist-share-email" title="Email">
+							<i class="fa-solid fa-envelope"></i>
+						</a>
+						<a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}" target="_blank" class="wishlist-share-facebook" title="Facebook">
+							<i class="fa-brands fa-facebook"></i>
+						</a>
+						<a href="https://twitter.com/intent/tweet?text=${encodeURIComponent('Check out my wishlist!')}&url=${encodeURIComponent(shareUrl)}" target="_blank" class="wishlist-share-twitter" title="Twitter">
+							<i class="fa-brands fa-x-twitter"></i>
+						</a>
+						<a href="https://pinterest.com/pin/create/button/?url=${encodeURIComponent(shareUrl)}&media=${firstImage}&description=${encodeURIComponent('My Wishlist - Check out my favorite products!')}" target="_blank" class="wishlist-share-pinterest" title="Pinterest">
+							<i class="fa-brands fa-pinterest"></i>
+						</a>
+					</div>
+				</div>
+			</div>
+		`);
+		
+		$('body').append(sharePopup);
+		
+		// Calculate position dynamically based on share button
+		var shareButton = $('.wishlist-sticky-share');
+		var buttonOffset = shareButton.offset();
+		var popupWidth = 280; // Approximate width of popup
+		
+		// Position popup to the left of the share button, vertically centered
+		var popupTop = buttonOffset.top - (sharePopup.outerHeight() / 2) + (shareButton.outerHeight() / 2);
+		var popupLeft = buttonOffset.left - popupWidth - 20;
+		
+		// Ensure popup stays within viewport
+		if (popupLeft < 20) {
+			popupLeft = 20;
+		}
+		
+		if (popupTop < 20) {
+			popupTop = 20;
+		}
+		
+		if (popupTop + sharePopup.outerHeight() > $(window).height() - 20) {
+			popupTop = $(window).height() - sharePopup.outerHeight() - 20;
+		}
+		
+		sharePopup.css({
+			display: 'block',
+			top: popupTop + 'px',
+			left: popupLeft + 'px'
+		});
+		
+		// Close handlers
+		sharePopup.find('.wishlist-share-popup-close').on('click', function() {
+			sharePopup.remove();
+		});
+		
+		$(document).on('click', function(e) {
+			if (!$(e.target).closest('.wishlist-share-popup').length && 
+				!$(e.target).closest('.wishlist-sticky-share').length) {
+				sharePopup.remove();
+			}
+		});
+		
+		// Copy URL functionality
+		sharePopup.find('.wishlist-copy-url-small').on('click', function() {
+			var input = sharePopup.find('input');
+			input.select();
+			
+			try {
+				document.execCommand('copy');
+				$(this).text('Copied!');
+				setTimeout(function() {
+					$(this).text('Copy');
+				}.bind(this), 2000);
+			} catch (err) {
+				alert('Please copy the URL manually.');
+			}
+		});
+	};
 });

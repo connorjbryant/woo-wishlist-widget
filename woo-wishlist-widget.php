@@ -57,6 +57,9 @@ function wishlist_init() {
 	add_action( 'wp_enqueue_scripts', 'wishlist_enqueue_assets' );
 
 	add_action( 'init', 'wishlist_register_endpoint' );
+	
+	// Add the public endpoint registration
+	add_action( 'init', 'wishlist_register_public_endpoint' );
 
 	add_filter( 'woocommerce_account_menu_items', 'wishlist_add_menu_item' );
 
@@ -71,6 +74,12 @@ function wishlist_init() {
     add_action( 'wp_ajax_wishlist_toggle', 'wishlist_ajax_toggle' );
     
     add_action( 'woocommerce_before_customer_login_form', 'wishlist_login_notice' );
+    
+    // Add the new AJAX action for toggling public status
+    add_action( 'wp_ajax_wishlist_toggle_public', 'wishlist_ajax_toggle_public' );
+    
+    // Add the share section to the wishlist endpoint
+    add_action( 'woocommerce_account_wishlist_endpoint', 'wishlist_add_share_section_to_endpoint', 5 );
 }
 
 /**
@@ -379,26 +388,65 @@ function wishlist_product_button() {
  * Display the sticky wishlist widget (vertical tab)
  */
 function wishlist_widget() {
-    $count = is_user_logged_in()
-		? count( wishlist_get_user_wishlist() )
-		: 0;
-    ?>
-    <a
-        href="<?php echo esc_url( wc_get_account_endpoint_url( 'wishlist' ) ); ?>"
-        class="wishlist-sticky-tab"
-        aria-label="<?php esc_attr_e( 'View wishlist', 'woocommerce-wishlist-widget' ); ?>"
-    >
-        <i class="fa-solid fa-heart wishlist-sticky-icon"></i>
+    $count = 0;
+    $show_share = false;
+    $share_url = '';
+    
+    if ( is_user_logged_in() ) {
+        $user_id = get_current_user_id();
         
-        <span
-            class="wishlist-count<?php echo 0 === $count ? ' is-empty' : ''; ?>"
-            aria-live="polite"
+        // Get wishlist items
+        $wishlist = wishlist_get_user_wishlist();
+        $count = is_array( $wishlist ) ? count( $wishlist ) : 0;
+        
+        // Check if wishlist is public
+        $is_public = get_user_meta( $user_id, '_wishlist_public', true );
+        
+        // Debug: You can uncomment these to check values
+        // error_log('Is public: ' . var_export($is_public, true));
+        // error_log('Count: ' . $count);
+        
+        // Only show share button if:
+        // 1. Wishlist is public (meta value is 'yes')
+        // 2. User has at least one item in their wishlist
+        if ( $is_public === 'yes' && $count > 0 ) {
+            $share_key = wishlist_generate_share_key( $user_id );
+            $share_url = home_url( '/wishlist/' . $share_key . '/' );
+            $show_share = true;
+        }
+    }
+    ?>
+    <div class="wishlist-sticky-wrapper">
+        <!-- Main Wishlist Button -->
+        <a
+            href="<?php echo esc_url( wc_get_account_endpoint_url( 'wishlist' ) ); ?>"
+            class="wishlist-sticky-tab"
+            aria-label="<?php esc_attr_e( 'View wishlist', 'woocommerce-wishlist-widget' ); ?>"
         >
-            <?php echo esc_html( $count ); ?>
-        </span>
-
-        <!--<span class="wishlist-sticky-text">Wishlist</span>-->
-    </a>
+            <span class="wishlist-sticky-icon-wrapper">
+                <i class="fa-solid fa-heart wishlist-sticky-icon"></i>
+                <span
+                    class="wishlist-count<?php echo 0 === $count ? ' is-empty' : ''; ?>"
+                    aria-live="polite"
+                >
+                    <?php echo esc_html( $count ); ?>
+                </span>
+            </span>
+        </a>
+        
+        <!-- Share Button - Only show if public AND has items -->
+        <?php if ( $show_share ) : ?>
+            <button
+                type="button"
+                class="wishlist-sticky-share"
+                onclick="wishlistShareWishlist('<?php echo esc_url( $share_url ); ?>')"
+                aria-label="<?php esc_attr_e( 'Share wishlist', 'woocommerce-wishlist-widget' ); ?>"
+                title="<?php esc_attr_e( 'Share your wishlist', 'woocommerce-wishlist-widget' ); ?>"
+            >
+                <i class="fa-solid fa-share-nodes"></i>
+            </button>
+        <?php endif; ?>
+    </div>
     <?php
 }
 
@@ -564,11 +612,331 @@ function wishlist_login_notice() {
 }
 
 /**
+ * Register public wishlist endpoint
+ */
+add_action( 'init', 'wishlist_register_public_endpoint' );
+
+function wishlist_register_public_endpoint() {
+    add_rewrite_rule(
+        '^wishlist/([^/]+)/?$',
+        'index.php?wishlist_public=$matches[1]',
+        'top'
+    );
+    
+    add_rewrite_tag( '%wishlist_public%', '([^&]+)' );
+}
+
+/**
+ * Add public wishlist query var
+ */
+add_filter( 'query_vars', 'wishlist_public_query_vars' );
+
+function wishlist_public_query_vars( $vars ) {
+    $vars[] = 'wishlist_public';
+    return $vars;
+}
+
+/**
+ * Handle public wishlist viewing
+ */
+add_action( 'template_redirect', 'wishlist_public_template' );
+
+function wishlist_public_template() {
+    $wishlist_key = get_query_var( 'wishlist_public' );
+    
+    if ( empty( $wishlist_key ) ) {
+        return;
+    }
+    
+    // Find user by wishlist key
+    $user_id = wishlist_get_user_by_share_key( $wishlist_key );
+    
+    if ( ! $user_id ) {
+        wp_die( 'Wishlist not found or is private.', 'Wishlist Not Found', array( 'response' => 404 ) );
+    }
+    
+    // Check if user has made their wishlist public
+    $is_public = get_user_meta( $user_id, '_wishlist_public', true );
+    
+    if ( ! $is_public ) {
+        wp_die( 'This wishlist is private.', 'Private Wishlist', array( 'response' => 403 ) );
+    }
+    
+    // Display the public wishlist
+    wishlist_display_public_wishlist( $user_id );
+    exit;
+}
+
+/**
+ * Get user by wishlist share key
+ */
+function wishlist_get_user_by_share_key( $share_key ) {
+    global $wpdb;
+    
+    $user_id = $wpdb->get_var(
+        $wpdb->prepare(
+            "SELECT user_id FROM {$wpdb->usermeta} 
+            WHERE meta_key = '_wishlist_share_key' 
+            AND meta_value = %s",
+            $share_key
+        )
+    );
+    
+    return $user_id ? intval( $user_id ) : false;
+}
+
+/**
+ * Generate unique share key for user
+ */
+function wishlist_generate_share_key( $user_id ) {
+    $share_key = get_user_meta( $user_id, '_wishlist_share_key', true );
+    
+    if ( empty( $share_key ) ) {
+        $share_key = wp_generate_password( 12, false, false );
+        update_user_meta( $user_id, '_wishlist_share_key', $share_key );
+    }
+    
+    return $share_key;
+}
+
+/**
+ * Display public wishlist
+ */
+function wishlist_display_public_wishlist( $user_id ) {
+    $user = get_userdata( $user_id );
+    $wishlist = get_user_meta( $user_id, '_wishlist_products', true );
+    $wishlist = is_array( $wishlist ) ? $wishlist : [];
+    
+    get_header();
+    ?>
+    <div class="wishlist-public-container">
+        <div class="wishlist-public-header">
+            <h1>
+                <?php 
+                printf(
+                    esc_html__( '%s\'s Wishlist', 'woocommerce-wishlist-widget' ),
+                    esc_html( $user->display_name )
+                );
+                ?>
+            </h1>
+        </div>
+        
+        <?php if ( empty( $wishlist ) ) : ?>
+            <div class="wishlist-empty">
+                <p><?php esc_html_e( 'This wishlist is empty.', 'woocommerce-wishlist-widget' ); ?></p>
+            </div>
+        <?php else : ?>
+            <div class="wishlist-products">
+                <?php
+                foreach ( $wishlist as $product_id ) {
+                    $product = wc_get_product( $product_id );
+                    
+                    if ( ! $product || ! $product->is_visible() ) {
+                        continue;
+                    }
+                    
+                    $product_url = $product->get_permalink();
+                    ?>
+                    <div class="wishlist-product">
+                        <a class="wishlist-product-image" href="<?php echo esc_url( $product_url ); ?>">
+                            <?php echo wp_kses_post( $product->get_image() ); ?>
+                        </a>
+                        
+                        <div class="wishlist-product-information">
+                            <a href="<?php echo esc_url( $product_url ); ?>">
+                                <strong><?php echo esc_html( $product->get_name() ); ?></strong>
+                            </a>
+                            
+                            <?php if ( $product->get_sku() ) : ?>
+                                <span class="wishlist-product-sku">
+                                    <?php
+                                    printf(
+                                        esc_html__( 'SKU: %s', 'woocommerce-wishlist-widget' ),
+                                        esc_html( $product->get_sku() )
+                                    );
+                                    ?>
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <div class="wishlist-product-price">
+                            <?php echo wp_kses_post( $product->get_price_html() ); ?>
+                        </div>
+                        
+                        <div class="wishlist-product-cart">
+                            <?php
+                            if ( $product->is_purchasable() && $product->is_in_stock() ) :
+                                ?>
+                                <a
+                                    href="<?php echo esc_url( $product->add_to_cart_url() ); ?>"
+                                    class="button add_to_cart_button ajax_add_to_cart"
+                                    data-product_id="<?php echo esc_attr( $product_id ); ?>"
+                                    data-product_sku="<?php echo esc_attr( $product->get_sku() ); ?>"
+                                    data-quantity="1"
+                                    aria-label="<?php echo esc_attr( $product->add_to_cart_description() ); ?>"
+                                    rel="nofollow"
+                                >
+                                    <?php echo esc_html( $product->add_to_cart_text() ); ?>
+                                </a>
+                            <?php else : ?>
+                                <span class="wishlist-product-unavailable">
+                                    <?php esc_html_e( 'Currently unavailable', 'woocommerce-wishlist-widget' ); ?>
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php
+                }
+                ?>
+            </div>
+        <?php endif; ?>
+    </div>
+    <?php
+    get_footer();
+}
+
+/**
+ * Add share functionality to My Account wishlist page
+ */
+function wishlist_add_share_section() {
+    if ( ! is_user_logged_in() ) {
+        return;
+    }
+    
+    $user_id = get_current_user_id();
+    $is_public = get_user_meta( $user_id, '_wishlist_public', true );
+    $share_key = wishlist_generate_share_key( $user_id );
+    $share_url = home_url( '/wishlist/' . $share_key . '/' );
+    
+    // Get first product image for Pinterest
+    $wishlist = wishlist_get_user_wishlist();
+    $first_image = '';
+    if ( ! empty( $wishlist ) ) {
+        $first_product = wc_get_product( $wishlist[0] );
+        if ( $first_product && $first_product->get_image_id() ) {
+            $image_url = wp_get_attachment_image_url( $first_product->get_image_id(), 'medium' );
+            if ( $image_url ) {
+                $first_image = $image_url;
+            }
+        }
+    }
+    // Fallback to site icon if no wishlist items
+    if ( empty( $first_image ) ) {
+        $first_image = get_site_icon_url();
+    }
+    ?>
+    
+    <div class="wishlist-share-section">
+        <h3><?php esc_html_e( 'Share Your Wishlist', 'woocommerce-wishlist-widget' ); ?></h3>
+        
+        <div class="wishlist-share-toggle">
+            <label for="wishlist_public_toggle">
+                <input 
+                    type="checkbox" 
+                    id="wishlist_public_toggle" 
+                    data-user-id="<?php echo esc_attr( $user_id ); ?>"
+                    <?php checked( $is_public, 'yes' ); ?>
+                >
+                <?php esc_html_e( 'Make wishlist public', 'woocommerce-wishlist-widget' ); ?>
+            </label>
+            <span class="wishlist-share-status">
+                <?php echo $is_public ? esc_html__( 'Public', 'woocommerce-wishlist-widget' ) : esc_html__( 'Private', 'woocommerce-wishlist-widget' ); ?>
+            </span>
+        </div>
+        
+        <div class="wishlist-share-url-wrapper" style="<?php echo $is_public ? 'display:block;' : 'display:none;'; ?>">
+            <div class="wishlist-share-url">
+                <input 
+                    type="text" 
+                    id="wishlist_share_url" 
+                    value="<?php echo esc_url( $share_url ); ?>" 
+                    readonly
+                    onclick="this.select();"
+                >
+                <button type="button" class="button wishlist-copy-url">
+                    <?php esc_html_e( 'Copy Link', 'woocommerce-wishlist-widget' ); ?>
+                </button>
+            </div>
+            
+            <div class="wishlist-social-share">
+                <span class="wishlist-share-label"><?php esc_html_e( 'Share via:', 'woocommerce-wishlist-widget' ); ?></span>
+                
+                <a href="mailto:?subject=<?php echo rawurlencode( 'Check out my wishlist!' ); ?>&body=<?php echo rawurlencode( "Here's my wishlist: " . $share_url ); ?>" 
+                   class="wishlist-share-email" 
+                   target="_blank">
+                    <i class="fa-solid fa-envelope"></i>
+                </a>
+                
+                <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo rawurlencode( $share_url ); ?>" 
+                   class="wishlist-share-facebook" 
+                   target="_blank">
+                    <i class="fa-brands fa-facebook"></i>
+                </a>
+                
+                <a href="https://twitter.com/intent/tweet?text=<?php echo rawurlencode( 'Check out my wishlist!' ); ?>&url=<?php echo rawurlencode( $share_url ); ?>" 
+                   class="wishlist-share-twitter" 
+                   target="_blank">
+                	<i class="fa-brands fa-square-x-twitter"></i>
+                </a>
+                
+                <a href="https://pinterest.com/pin/create/button/?url=<?php echo rawurlencode( $share_url ); ?>&media=<?php echo rawurlencode( $first_image ); ?>&description=<?php echo rawurlencode( 'My Wishlist - Check out my favorite products!' ); ?>" 
+                   class="wishlist-share-pinterest" 
+                   target="_blank">
+                    <i class="fa-brands fa-pinterest"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    <?php
+}
+
+/**
+ * Add share section to wishlist endpoint
+ */
+add_action( 'woocommerce_account_wishlist_endpoint', 'wishlist_add_share_section_to_endpoint', 5 );
+
+function wishlist_add_share_section_to_endpoint() {
+    if ( is_user_logged_in() ) {
+        // Add before the existing content
+        remove_action( 'woocommerce_account_wishlist_endpoint', 'wishlist_endpoint_content' );
+        add_action( 'woocommerce_account_wishlist_endpoint', 'wishlist_add_share_section' );
+        add_action( 'woocommerce_account_wishlist_endpoint', 'wishlist_endpoint_content' );
+    }
+}
+
+/**
+ * AJAX handler for toggling wishlist public status
+ */
+add_action( 'wp_ajax_wishlist_toggle_public', 'wishlist_ajax_toggle_public' );
+
+function wishlist_ajax_toggle_public() {
+    check_ajax_referer( 'wishlist_nonce', 'nonce' );
+    
+    if ( ! is_user_logged_in() ) {
+        wp_send_json_error( 'Must be logged in' );
+    }
+    
+    $user_id = get_current_user_id();
+    $is_public = isset( $_POST['is_public'] ) ? sanitize_text_field( $_POST['is_public'] ) : 'no';
+    
+    update_user_meta( $user_id, '_wishlist_public', $is_public );
+    
+    // Generate share key if not exists
+    wishlist_generate_share_key( $user_id );
+    
+    wp_send_json_success( array(
+        'is_public' => $is_public,
+        'share_url' => home_url( '/wishlist/' . get_user_meta( $user_id, '_wishlist_share_key', true ) . '/' )
+    ) );
+}
+
+/**
  * Register the endpoint and flush rewrite rules on activation.
  */
 function wishlist_activate() {
 	wishlist_register_endpoint();
-	flush_rewrite_rules();
+    wishlist_register_public_endpoint();
+    flush_rewrite_rules();
 }
 
 /**

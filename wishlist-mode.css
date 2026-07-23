@@ -1,214 +1,775 @@
-/* Wishlist Sticky Vertical Tab */
-.wishlist-sticky-tab {
-    position: fixed;
-    /* top: 50%; */
-    top: 25%;
-    right: 0;
-    /* left: 0; */
-    transform: translateY(-50%);
-    width: fit-content;
-    background: #ff1f1f;
-    color: #fff;
-    /* border-radius: 0px 14px 14px 0px; */
-    border-radius: 14px 0px 0px 14px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 1rem 0.8rem;
-    text-decoration: none;
-    z-index: 9999;
-    transition: all .25s ease;
-    box-shadow: 0 10px 30px rgba(0,0,0,.18);
-    gap: 0.6rem;
-}
+/**
+ * WooCommerce Wishlist Widget Styles
+ */
 
+/* ============================================
+   1. PRODUCT CARD HEART BUTTON
+   ============================================ */
+
+/* Make product card the positioning container */
 .woocommerce ul.products li.product,
 .product,
 .ht-product {
-	position: relative;
+    position: relative;
 }
 
-.wishlist-sticky-tab:hover, .wishlist-sticky-tab:active {
-    background: #e00d0d;
-    /* transform: translateY(-50%) translateX(-8px); */
-    box-shadow: 0 12px 35px rgba(0,0,0,.25);
-    color: white !important;
-}
-
-.wishlist-sticky-tab:hover i, .wishlist-sticky-tab:active {
-    color: white !important;
-}
-
-.wishlist-sticky-tab:focus {
-    color: white !important;
-}
-
-.wishlist-sticky-icon {
-    font-size: 28px;
-}
-
-.wishlist-sticky-text {
-    writing-mode: vertical-rl;
-    transform: rotate(180deg);
-    text-transform: uppercase;
-    letter-spacing: 3px;
-    font-weight: 700;
-    font-size: 1.1rem;
-    white-space: nowrap;
-}
-
-/* Count Badge */
-.wishlist-sticky-tab .wishlist-count {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    background: #fff;
-    color: #ff1f1f;
-    font-size: 13px;
-    font-weight: bold;
-    min-width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-    padding: 0 5px;
-}
-
-/* Make the product card the positioning container. */
-.woocommerce ul.products li.product {
-	position: relative;
-}
-
-/* Heart position over the upper-right corner of the product image. */
+/* Heart wrapper - positioned top-right of product image */
 .wishlist-heart-wrapper {
-	position: absolute;
-	top: 8px;
-	right: 8px;
-	z-index: 10;
+    position: absolute;
+    top: 8px;
+    left: 1.5rem;
+    z-index: 10;
 }
 
+/* Heart button */
 .wishlist-heart-btn {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	gap: 1px;
-	padding: 0;
-	border: 0;
-	background: transparent;
-	color: #777;
-	cursor: pointer;
-	line-height: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #777;
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.2s ease;
 }
 
 .wishlist-heart-btn:hover,
 .wishlist-heart-btn:focus {
-	background: transparent;
-	color: #333;
+    background: transparent;
+    color: #333;
 }
 
 .wishlist-heart-icon {
-	font-size: 30px;
-	line-height: 1;
+    font-size: 30px;
+    line-height: 1;
 }
 
 .wishlist-heart-label {
-	font-size: 12px;
-	font-weight: 500;
-	line-height: 1;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
 }
 
-/* Only show the outline by default. */
+/* Heart states */
 .wishlist-heart-filled {
-	display: none;
+    display: none;
 }
 
-/* Show the solid heart after saving. */
 .wishlist-heart-btn.favorited .wishlist-heart-empty {
-	display: none;
+    display: none;
 }
 
 .wishlist-heart-btn.favorited .wishlist-heart-filled {
-	display: inline;
+    display: inline;
 }
 
 .wishlist-heart-btn.favorited {
-	color: #e11d2e;
+    color: #e11d2e;
 }
 
 .wishlist-heart-btn.loading {
-	opacity: 0.5;
-	pointer-events: none;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* ============================================
+   2. STICKY SIDEBAR WIDGET
+   ============================================ */
+
+/* Main sticky wrapper - vertical sidebar */
+.wishlist-sticky-wrapper {
+    position: fixed;
+    top: 25%;
+    right: 0;
+    transform: translateY(-50%);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #ff1f1f;
+    border-radius: 14px 0 0 14px;
+    padding: 16px 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+    transition: all 0.25s ease;
+    gap: 8px;
+}
+
+.wishlist-sticky-wrapper:hover {
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.25);
+}
+
+/* Main wishlist button */
+.wishlist-sticky-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    text-decoration: none;
+    transition: all 0.25s ease;
+    position: relative;
+    gap: 0;
+}
+
+.wishlist-sticky-tab:hover {
+    color: #fff;
+}
+
+.wishlist-sticky-tab:focus {
+    color: #fff;
+}
+
+/* Heart icon with count inside */
+.wishlist-sticky-icon-wrapper {
+    position: relative;
+    display: inline-block;
+    line-height: 1;
+}
+
+.wishlist-sticky-icon {
+    font-size: 36px;
+    line-height: 1;
+    color: #fff;
+}
+
+/* Count badge - positioned inside the heart */
+.wishlist-sticky-tab .wishlist-count {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 14px;
+    font-weight: 700;
+    color: #ff1f1f;
+    min-width: 20px;
+    text-align: center;
+    line-height: 1;
+    transition: all 0.3s ease;
 }
 
 .wishlist-count.is-empty {
-	display: none;
+    opacity: 0.5;
 }
 
+/* Share button - attached to bottom of sidebar */
+.wishlist-sticky-share {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.7);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    font-size: 14px;
+    margin-top: 4px;
+    position: relative;
+}
+
+.wishlist-sticky-share:hover, .wishlist-sticky-share:active, .wishlist-sticky-share:focus, .wishlist-sticky-share:focus-visible, .wishlist-sticky-share:focus-within {
+    color: #fff;
+    transform: scale(1.08);
+	background-color: transparent;
+}
+
+/* Tooltip for share button - appears to the left */
+.wishlist-sticky-share::before {
+    content: 'Share';
+    position: absolute;
+    right: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    white-space: nowrap;
+}
+
+.wishlist-sticky-share::after {
+    content: '';
+    position: absolute;
+    right: calc(100% + 4px);
+    top: 50%;
+    transform: translateY(-50%);
+    border: 6px solid transparent;
+    border-left-color: rgba(0, 0, 0, 0.8);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.wishlist-sticky-share:hover::before,
+.wishlist-sticky-share:hover::after {
+    opacity: 1;
+}
+
+/* ============================================
+   3. SHARE POPUP - DYNAMIC POSITIONING
+   ============================================ */
+
+.wishlist-share-popup {
+    display: none;
+    position: fixed;
+    z-index: 10000;
+    /* Position will be set by JavaScript */
+}
+
+.wishlist-share-popup-content {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    min-width: 280px;
+    overflow: hidden;
+    border: 1px solid #f0f0f0;
+}
+
+.wishlist-share-popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid #f0f0f0;
+    font-weight: 600;
+    font-size: 14px;
+    color: #333;
+}
+
+.wishlist-share-popup-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: #999;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.2s ease;
+}
+
+.wishlist-share-popup-close:hover, .wishlist-share-popup-close:active, .wishlist-share-popup-close:focus, .wishlist-share-popup-close:focus-visible {
+    color: #333;
+	background-color: transparent;
+}
+
+.wishlist-share-popup-body {
+    padding: 16px;
+}
+
+.wishlist-share-popup-url {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.wishlist-share-popup-url input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 13px;
+    background: #f8f8f8;
+    color: #333;
+    outline: none;
+}
+
+.wishlist-share-popup-url input:focus {
+    border-color: #ff1f1f;
+}
+
+.wishlist-copy-url-small {
+    padding: 6px 14px;
+    font-size: 12px;
+    background: #ff1f1f;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s ease;
+}
+
+.wishlist-copy-url-small:hover {
+    background: #e00d0d;
+}
+
+.wishlist-share-popup-social {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.wishlist-share-popup-social a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    color: #fff;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    font-size: 16px;
+}
+
+.wishlist-share-popup-social a:hover {
+    transform: scale(1.1);
+}
+
+.wishlist-share-popup-social .wishlist-share-email {
+    background: #666;
+}
+
+.wishlist-share-popup-social .wishlist-share-facebook {
+    background: #1877f2;
+}
+
+.wishlist-share-popup-social .wishlist-share-twitter {
+    background: #000000;
+}
+
+.wishlist-share-popup-social .wishlist-share-pinterest {
+    background: #bd081c;
+}
+
+/* ============================================
+   4. MY ACCOUNT - WISHLIST PAGE
+   ============================================ */
+
+/* Login prompt for non-logged-in users */
+.wishlist-login-message {
+    text-align: center;
+    padding: 40px 20px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+.wishlist-login-message h2 {
+    margin-bottom: 15px;
+}
+
+.wishlist-login-message p {
+    margin-bottom: 20px;
+    font-size: 16px;
+}
+
+/* Empty wishlist state */
+.wishlist-empty {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.wishlist-empty-message {
+    font-size: 16px;
+    margin-bottom: 20px;
+}
+
+/* Wishlist product list */
 .wishlist-products {
-	border-top: 1px solid #ddd;
+    border-top: 1px solid #ddd;
+    margin-top: 20px;
 }
 
+/* Individual product row */
 .wishlist-product {
-	display: grid;
-	grid-template-columns: 32px 100px minmax(0, 1fr) 150px 150px;
-	align-items: center;
-	gap: 20px;
-	padding: 20px 0;
-	border-bottom: 1px solid #ddd;
+    display: grid;
+    grid-template-columns: 32px 100px minmax(0, 1fr) 150px 150px;
+    align-items: center;
+    gap: 20px;
+    padding: 20px 0;
+    border-bottom: 1px solid #ddd;
 }
 
+/* Remove button (X) - NO BACKGROUND ON HOVER */
 .wishlist-product .wishlist-remove-button {
-	position: static;
-	font-size: 18px;
-	color: #999;
+    position: static;
+    font-size: 18px;
+    color: #999;
+    background: transparent !important;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.2s ease;
 }
 
+.wishlist-product .wishlist-remove-button:hover {
+    color: #e11d2e;
+    background: transparent !important;
+}
+
+.wishlist-product .wishlist-remove-button:focus {
+    background: transparent !important;
+    outline: none;
+}
+
+/* Product image */
 .wishlist-product-image img {
-	display: block;
-	width: 100px;
-	height: 100px;
-	object-fit: contain;
+    display: block;
+    width: 100px;
+    height: 100px;
+    object-fit: contain;
+    border: 1px solid #eee;
+    border-radius: 4px;
 }
 
+/* Product info */
 .wishlist-product-information {
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
 .wishlist-product-information a {
-	color: inherit;
-	text-decoration: none;
+    color: inherit;
+    text-decoration: none;
+}
+
+.wishlist-product-information a:hover {
+    color: #e11d2e;
 }
 
 .wishlist-product-sku {
-	color: #777;
-	font-size: 14px;
+    color: #777;
+    font-size: 14px;
 }
 
+/* Product price */
 .wishlist-product-price {
-	font-weight: 700;
+    font-weight: 700;
+    font-size: 16px;
+}
+
+/* Add to cart */
+.wishlist-product-cart .add_to_cart_button {
+    white-space: nowrap;
+}
+
+.wishlist-product-unavailable {
+    color: #999;
+    font-size: 14px;
+}
+
+/* Actions */
+.wishlist-actions {
+    margin-top: 30px;
+    text-align: center;
 }
 
 .wishlist-continue-shopping {
-	margin-top: 24px;
+    margin-top: 24px;
 }
 
+/* ============================================
+   5. MY ACCOUNT - SHARE SECTION
+   ============================================ */
+
+.wishlist-share-section {
+    margin: 30px 0 20px;
+    padding: 25px 30px;
+    background: #f9f9f9;
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+}
+
+.wishlist-share-section h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+.wishlist-share-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.wishlist-share-toggle label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.wishlist-share-toggle input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.wishlist-share-status {
+    font-size: 13px;
+    padding: 2px 12px;
+    border-radius: 12px;
+    background: #ddd;
+    color: #666;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.wishlist-share-toggle input:checked ~ .wishlist-share-status {
+    background: #4CAF50;
+    color: white;
+}
+
+.wishlist-share-url-wrapper {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #e5e5e5;
+}
+
+.wishlist-share-url {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.wishlist-share-url input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    font-size: 14px;
+    color: #333;
+}
+
+.wishlist-share-url input:focus {
+    border-color: #e11d2e;
+    outline: none;
+}
+
+.wishlist-share-url .button {
+    flex-shrink: 0;
+}
+
+/* Social share icons in My Account */
+.wishlist-social-share {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.wishlist-share-label {
+    font-weight: 500;
+    color: #666;
+    margin-right: 5px;
+}
+
+.wishlist-social-share a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    color: white;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    font-size: 16px;
+}
+
+.wishlist-social-share a:hover {
+    opacity: 0.8;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+.wishlist-social-share .wishlist-share-email {
+    background: #666;
+}
+
+.wishlist-social-share .wishlist-share-facebook {
+    background: #1877f2;
+}
+
+.wishlist-social-share .wishlist-share-twitter {
+    background: #000000;
+}
+
+.wishlist-social-share .wishlist-share-pinterest {
+    background: #bd081c;
+}
+
+/* ============================================
+   6. PUBLIC WISHLIST PAGE
+   ============================================ */
+
+.wishlist-public-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 20px;
+}
+
+.wishlist-public-header {
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.wishlist-public-header h1 {
+    margin: 0;
+    font-size: 28px;
+}
+
+/* ============================================
+   7. LOGIN NOTICE
+   ============================================ */
+
+.woocommerce-info.wishlist-login-notice {
+    margin-bottom: 20px;
+}
+
+.woocommerce-info.wishlist-login-notice strong {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 16px;
+}
+
+.woocommerce-info.wishlist-login-notice p {
+    margin-bottom: 0;
+}
+
+/* ============================================
+   8. RESPONSIVE - MOBILE
+   ============================================ */
+
 @media (max-width: 767px) {
-	.wishlist-product {
-		grid-template-columns: 28px 80px minmax(0, 1fr);
-		gap: 12px;
-	}
+    /* Product heart */
+    .wishlist-heart-icon {
+        font-size: 24px;
+    }
+    
+    .wishlist-heart-label {
+        font-size: 10px;
+    }
+    
+    .wishlist-heart-wrapper {
+        top: 5px;
+        left: 5px;
+    }
 
-	.wishlist-product-image img {
-		width: 80px;
-		height: 80px;
-	}
+    /* Sticky sidebar - smaller on mobile */
+    .wishlist-sticky-wrapper {
+        padding: 12px 10px;
+        gap: 6px;
+    }
+    
+    .wishlist-sticky-icon {
+        font-size: 28px;
+    }
+    
+    .wishlist-sticky-tab .wishlist-count {
+        font-size: 12px;
+        min-width: 16px;
+    }
+    
+    .wishlist-sticky-share {
+        width: 28px;
+        height: 28px;
+        font-size: 12px;
+    }
+    
+    /* Hide tooltips on mobile */
+    .wishlist-sticky-share::before,
+    .wishlist-sticky-share::after {
+        display: none;
+    }
 
-	.wishlist-product-price,
-	.wishlist-product-cart {
-		grid-column: 3;
-	}
+    /* My Account wishlist */
+    .wishlist-product {
+        grid-template-columns: 28px 80px minmax(0, 1fr);
+        gap: 12px;
+        padding: 15px 0;
+    }
+
+    .wishlist-product-image img {
+        width: 80px;
+        height: 80px;
+    }
+
+    .wishlist-product-price,
+    .wishlist-product-cart {
+        grid-column: 3;
+    }
+    
+    .wishlist-product-price {
+        margin-top: 5px;
+    }
+    
+    .wishlist-product-cart .add_to_cart_button {
+        width: 100%;
+        text-align: center;
+        font-size: 13px;
+    }
+
+    /* Share section */
+    .wishlist-share-section {
+        padding: 20px;
+    }
+
+    .wishlist-share-url {
+        flex-direction: column;
+    }
+    
+    .wishlist-share-url .button {
+        width: 100%;
+        text-align: center;
+    }
+    
+    .wishlist-social-share {
+        justify-content: center;
+    }
+    
+    .wishlist-share-section h3 {
+        text-align: center;
+    }
+    
+    .wishlist-share-toggle {
+        justify-content: center;
+    }
+
+    /* Public wishlist */
+    .wishlist-public-container {
+        padding: 20px 15px;
+    }
+    
+    .wishlist-public-header h1 {
+        font-size: 22px;
+    }
+}
+
+/* ============================================
+   9. RESPONSIVE - EXTRA SMALL
+   ============================================ */
+
+@media (max-width: 480px) {
+    .wishlist-sticky-wrapper {
+        padding: 10px 8px;
+    }
+    
+    .wishlist-sticky-icon {
+        font-size: 24px;
+    }
+    
+    .wishlist-sticky-tab .wishlist-count {
+        font-size: 10px;
+        min-width: 14px;
+    }
+    
+    .wishlist-sticky-share {
+        width: 24px;
+        height: 24px;
+        font-size: 10px;
+    }
 }
