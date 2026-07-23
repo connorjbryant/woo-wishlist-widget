@@ -58,14 +58,14 @@ function wishlist_init() {
 
 	add_action( 'init', 'wishlist_register_endpoint' );
 	
-	// Add the public endpoint registration
+	// Public endpoint registration
 	add_action( 'init', 'wishlist_register_public_endpoint' );
 
 	add_filter( 'woocommerce_account_menu_items', 'wishlist_add_menu_item' );
 
 	add_action( 'woocommerce_account_wishlist_endpoint', 'wishlist_endpoint_content' );
 
-	add_action( 'woocommerce_after_add_to_cart_form', 'wishlist_product_button' );
+	add_action( 'woocommerce_after_add_to_cart_button', 'wishlist_product_button' );
 
     add_action( 'woocommerce_before_shop_loop_item_title', 'wishlist_add_heart_to_product_card', 5 );
 
@@ -75,13 +75,13 @@ function wishlist_init() {
     
     add_action( 'woocommerce_before_customer_login_form', 'wishlist_login_notice' );
     
-    // Add the new AJAX action for toggling public status
+    // AJAX action for toggling public status
     add_action( 'wp_ajax_wishlist_toggle_public', 'wishlist_ajax_toggle_public' );
     
-    // Add the share section to the wishlist endpoint
+    // Share section to the wishlist endpoint
     add_action( 'woocommerce_account_wishlist_endpoint', 'wishlist_add_share_section_to_endpoint', 5 );
     
-    // Add template filter for public wishlist - THIS REPLACES template_redirect
+    // Template filter for public wishlist
     add_filter( 'template_include', 'wishlist_public_template_include', 99 );
 }
 
@@ -112,16 +112,7 @@ function wishlist_public_template_include( $template ) {
         // Set query var for template
         set_query_var( 'wishlist_user_id', $user_id );
         
-        // Look for template in this order:
-        // 1. Theme: /themes/their-theme/woocommerce-wishlist-widget/public-wishlist.php
-        // 2. Plugin: /plugins/woocommerce-wishlist-widget/templates/public-wishlist.php
-        
-        // Check if theme has a custom template
-        $theme_template = locate_template( 'woocommerce-wishlist-widget/public-wishlist.php' );
-        
-        if ( $theme_template ) {
-            return $theme_template;
-        }
+        // Look for template: woocommerce-wishlist-widget/templates/public-wishlist.php
         
         // Use plugin template
         $plugin_template = plugin_dir_path( __FILE__ ) . 'templates/public-wishlist.php';
@@ -199,12 +190,12 @@ function wishlist_add_menu_item( $items ) {
 }
 
 /**
- * Display the Wishlist endpoint content.
+ * Display the Wishlist endpoint content
  */
 function wishlist_endpoint_content() {
 
 	/*
-	 * Show a login/account prompt when the visitor is logged out.
+	 * Show a login/account prompt when the visitor is logged out
 	 */
 	if ( ! is_user_logged_in() ) {
 		?>
@@ -258,7 +249,7 @@ function wishlist_endpoint_content() {
 	<?php
 
 	/*
-	 * Display an empty-wishlist message.
+	 * Display an empty-wishlist message
 	 */
 	if ( empty( $wishlist ) ) {
 		?>
@@ -290,7 +281,7 @@ function wishlist_endpoint_content() {
 	}
 
 	/*
-	 * Display the saved products.
+	 * Display the saved products
 	 */
 	?>
 	<div class="wishlist-products">
@@ -299,7 +290,7 @@ function wishlist_endpoint_content() {
 			$product = wc_get_product( $product_id );
 
 			/*
-			 * Skip products that were deleted or are no longer visible.
+			 * Skip products that were deleted or are no longer visible
 			 */
 			if ( ! $product || ! $product->is_visible() ) {
 				continue;
@@ -345,7 +336,7 @@ function wishlist_endpoint_content() {
 						<span class="wishlist-product-sku">
 							<?php
 							printf(
-								/* translators: %s is the product SKU. */
+								/* %s is the product SKU. */
 								esc_html__(
 									'SKU: %s',
 									'woocommerce-wishlist-widget'
@@ -422,18 +413,27 @@ function wishlist_endpoint_content() {
 
 /**
  * Display the wishlist button on product pages
- *
- * Placeholder until storage functionality is added
  */
 function wishlist_product_button() {
+	global $product;
+	
+	if ( ! $product instanceof WC_Product ) {
+		return;
+	}
+	
+	$product_id = $product->get_id();
+	$wishlist = is_user_logged_in() ? wishlist_get_user_wishlist() : array();
+	$is_favorited = in_array($product_id, $wishlist, true);
+	$button_text = $is_favorited ? __('Remove from Wishlist', 'woocommerce-wishlist-widget') : __('Add to Wishlist', 'woocommerce-wishlist-widget');
 	?>
-	<button type="button" class="button wishlist-product-button">
-		<?php
-		esc_html_e(
-			'Add to Wishlist',
-			'woocommerce-wishlist-widget'
-		);
-		?>
+	<button 
+		type="button" 
+		style="margin-left: 0.5rem;" 
+		class="button wishlist-product-button<?php echo $is_favorited ? ' favorited' : ''; ?>" 
+		data-product-id="<?php echo esc_attr($product_id); ?>"
+		aria-pressed="<?php echo $is_favorited ? 'true' : 'false'; ?>"
+	>
+		<?php echo esc_html($button_text); ?>
 	</button>
 	<?php
 }

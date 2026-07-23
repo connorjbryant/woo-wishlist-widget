@@ -444,4 +444,65 @@ jQuery(function ($) {
 			}
 		});
 	};
+
+	// Single product page wishlist button toggle
+	$(document).on('click', '.wishlist-product-button', function(event) {
+		event.preventDefault();
+		
+		if (!wishlistData.isLoggedIn) {
+			window.location.href = wishlistData.wishlistUrl;
+			return;
+		}
+		
+		const button = $(this);
+		const productId = parseInt(button.data('product-id'), 10);
+		
+		if (!productId || button.hasClass('loading')) {
+			return;
+		}
+		
+		button.addClass('loading');
+		
+		$.ajax({
+			url: wishlistData.ajaxUrl,
+			type: 'POST',
+			dataType: 'json',
+			data: {
+				action: 'wishlist_toggle',
+				nonce: wishlistData.nonce,
+				product_id: productId
+			}
+		})
+		.done(function(response) {
+			if (!response.success) {
+				alert(response.data || 'Something went wrong.');
+				return;
+			}
+			
+			const isFavorited = response.data.is_favorited;
+			const count = parseInt(response.data.count, 10) || 0;
+			
+			// Update button text
+			button.text(isFavorited ? 'Remove from Wishlist' : 'Add to Wishlist');
+			button.toggleClass('favorited', isFavorited);
+			
+			// Update heart icon on product card if it exists
+			const matchingButtons = $('.wishlist-heart-btn[data-product-id="' + productId + '"]');
+			matchingButtons
+				.toggleClass('favorited', isFavorited)
+				.attr('aria-pressed', isFavorited ? 'true' : 'false')
+				.attr('aria-label', isFavorited ? 'Remove from wishlist' : 'Add to wishlist');
+			
+			// Update wishlist count
+			$('.wishlist-count')
+				.text(count)
+				.toggleClass('is-empty', count === 0);
+		})
+		.fail(function() {
+			alert('The wishlist could not be updated.');
+		})
+		.always(function() {
+			button.removeClass('loading');
+		});
+	});
 });
