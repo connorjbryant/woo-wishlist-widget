@@ -17,8 +17,8 @@
 /* Heart wrapper - positioned top-right of product image */
 .wishlist-heart-wrapper {
     position: absolute;
-    top: 8px;
-    left: 1.5rem;
+    top: 0.6rem;
+    left: 1.1rem;
     z-index: 10;
 }
 
@@ -896,4 +896,20 @@
 
 .wishlist-product-cart a.added_to_cart.wc-forward {
     color: black !important;
+}
+
+/* Square images - position at 1rem */
+.wishlist-heart-wrapper[data-square="true"] {
+    position: absolute !important;
+    top: 1rem !important;
+    left: 1rem !important;
+    z-index: 10 !important;
+}
+
+/* Non-square images - default positioning */
+.wishlist-heart-wrapper[data-square="false"] {
+    position: absolute !important;
+    top: 8px !important;
+    left: 8px !important;
+    z-index: 10 !important;
 }

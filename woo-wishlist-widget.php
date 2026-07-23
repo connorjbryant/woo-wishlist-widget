@@ -583,8 +583,21 @@ function wishlist_add_heart_to_product_card() {
     	$wishlist,
     	true
     );
-	?>
-	<div class="wishlist-heart-wrapper">
+    
+    // Check if product image has square aspect ratio
+    $image_id = $product->get_image_id();
+    $is_square = false;
+    if ($image_id) {
+        $image_data = wp_get_attachment_image_src($image_id, 'woocommerce_thumbnail');
+        if ($image_data) {
+            $width = $image_data[1];
+            $height = $image_data[2];
+            // Check if image is square (or close to it)
+            $is_square = ($width == $height);
+        }
+    }
+    ?>
+	<div class="wishlist-heart-wrapper" data-square="<?php echo $is_square ? 'true' : 'false'; ?>">
 		<button
 			type="button"
 			class="wishlist-heart-btn<?php echo $is_favorited ? ' favorited' : ''; ?>"
